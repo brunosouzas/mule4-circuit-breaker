@@ -1,0 +1,24 @@
+{
+  "extensionModelLoaderDescriptor": {
+    "id": "java",
+    "attributes": {
+      "type": "com.brunosouzas.mule.extension.circuitbreaker.internal.CircuitBreakerExtension",
+      "version": "1.0.0-SNAPSHOT"
+    }
+  },
+  "minMuleVersion": "4.9.1",
+  "name": "mule4-circuit-breaker",
+  "requiredProduct": "MULE",
+  "classLoaderModelLoaderDescriptor": {
+    "id": "mule",
+    "attributes": {
+      "exportedPackages": ["com.brunosouzas.mule.extension.circuitbreaker.api"],
+      "exportedResources": []
+    }
+  },
+  "bundleDescriptorLoader": {
+    "id": "mule",
+    "attributes": {}
+  },
+  "supportedJavaVersions": ["17"]
+}

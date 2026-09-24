@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:circuit-breaker="http://www.mulesoft.org/schema/mule/circuit-breaker"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+
+	<munit:config name="circuit-breaker-test-suite.xml" />
+
+	<!--
+		circuit-breaker:execute is a scope, so every tunable is its own attribute — there is no shared
+		config to default from. Every test below repeats the same small, deterministic values: two calls
+		fill the window, one failure over 50% opens it, a 500ms resetTimeout is short enough for tests to
+		wait past it, a single HALF_OPEN test call is enough to close it again, and only HTTP:TIMEOUT counts
+		as a circuit failure (so tests can raise other error types to prove they never open the circuit,
+		per ADR-001). Each test uses its own circuitBreakerKey so runs never interfere with each other.
+	-->
+
+	<munit:test name="cb-successful-call-passes-payload-through" description="A successful call in CLOSED passes the payload through unchanged">
+		<munit:execution>
+			<circuit-breaker:execute circuitBreakerKey="success-test" windowSize="2" minimumCalls="2"
+				failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+				failureErrorTypes="HTTP:TIMEOUT">
+				<set-payload doc:name="Simulate success" value="#['ok']" />
+			</circuit-breaker:execute>
+		</munit:execution>
+		<munit:validation>
+			<munit-tools:assert-that doc:name="Payload" expression="#[payload]" is="#[MunitTools::equalTo('ok')]" />
+		</munit:validation>
+	</munit:test>
+
+	<munit:test name="cb-blocked-call-while-open-raises-circuit-breaker-open"
+		description="Once enough HTTP:TIMEOUT failures open the circuit, the next call is blocked with CIRCUIT-BREAKER:OPEN"
+		expectedErrorType="CIRCUIT-BREAKER:OPEN">
+		<munit:execution>
+			<try doc:name="Failure 1 (ignored)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="blocked-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate timeout" type="HTTP:TIMEOUT" description="Simulated timeout" />
+				</circuit-breaker:execute>
+			</try>
+			<try doc:name="Failure 2 (ignored, opens the circuit)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="blocked-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate timeout" type="HTTP:TIMEOUT" description="Simulated timeout" />
+				</circuit-breaker:execute>
+			</try>
+			<circuit-breaker:execute doc:name="Blocked call" circuitBreakerKey="blocked-test" windowSize="2"
+				minimumCalls="2" failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1"
+				successThreshold="1" failureErrorTypes="HTTP:TIMEOUT">
+				<set-payload doc:name="Should not run" value="#['should not run']" />
+			</circuit-breaker:execute>
+		</munit:execution>
+	</munit:test>
+
+	<munit:test name="cb-business-error-never-opens-the-circuit"
+		description="An error type outside failureErrorTypes never counts as a circuit failure, no matter how many times it repeats"
+		expectedErrorType="APP:VALIDATION">
+		<munit:execution>
+			<try doc:name="Business error 1 (ignored)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="business-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate validation error" type="APP:VALIDATION" description="Simulated validation error" />
+				</circuit-breaker:execute>
+			</try>
+			<try doc:name="Business error 2 (ignored)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="business-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate validation error" type="APP:VALIDATION" description="Simulated validation error" />
+				</circuit-breaker:execute>
+			</try>
+			<try doc:name="Business error 3 (ignored)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="business-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate validation error" type="APP:VALIDATION" description="Simulated validation error" />
+				</circuit-breaker:execute>
+			</try>
+			<circuit-breaker:execute doc:name="Still not blocked" circuitBreakerKey="business-test" windowSize="2"
+				minimumCalls="2" failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1"
+				successThreshold="1" failureErrorTypes="HTTP:TIMEOUT">
+				<raise-error doc:name="Simulate validation error" type="APP:VALIDATION" description="Simulated validation error" />
+			</circuit-breaker:execute>
+		</munit:execution>
+	</munit:test>
+
+	<munit:test name="cb-two-circuit-keys-stay-independent"
+		description="Two different circuitBreakerKeys stay independent: opening one never affects the other">
+		<munit:execution>
+			<try doc:name="svc-a failure 1 (ignored)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="svc-a" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate timeout" type="HTTP:TIMEOUT" description="Simulated timeout" />
+				</circuit-breaker:execute>
+			</try>
+			<try doc:name="svc-a failure 2 (ignored, opens svc-a)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="svc-a" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate timeout" type="HTTP:TIMEOUT" description="Simulated timeout" />
+				</circuit-breaker:execute>
+			</try>
+			<try doc:name="svc-a is now blocked">
+				<error-handler>
+					<on-error-continue type="CIRCUIT-BREAKER:OPEN">
+						<set-variable doc:name="Record blocked" variableName="svcABlocked" value="#[true]" />
+					</on-error-continue>
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="svc-a" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<set-payload doc:name="Should not run" value="#['should not run']" />
+				</circuit-breaker:execute>
+			</try>
+			<circuit-breaker:execute doc:name="svc-b still works" circuitBreakerKey="svc-b" windowSize="2"
+				minimumCalls="2" failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1"
+				successThreshold="1" failureErrorTypes="HTTP:TIMEOUT">
+				<set-payload doc:name="Simulate success" value="#['svc-b-ok']" />
+			</circuit-breaker:execute>
+		</munit:execution>
+		<munit:validation>
+			<munit-tools:assert-that doc:name="svc-a was blocked" expression="#[vars.svcABlocked]" is="#[MunitTools::equalTo(true)]" />
+			<munit-tools:assert-that doc:name="svc-b payload" expression="#[payload]" is="#[MunitTools::equalTo('svc-b-ok')]" />
+		</munit:validation>
+	</munit:test>
+
+	<munit:test name="cb-opens-blocks-and-recovers-after-reset-timeout"
+		description="End-to-end: the circuit opens after enough failures, blocks calls, and recovers once resetTimeout elapses and a HALF_OPEN test call succeeds">
+		<munit:execution>
+			<try doc:name="Failure 1 (ignored)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="recover-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate timeout" type="HTTP:TIMEOUT" description="Simulated timeout" />
+				</circuit-breaker:execute>
+			</try>
+			<try doc:name="Failure 2 (ignored, opens the circuit)">
+				<error-handler>
+					<on-error-continue type="ANY" />
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="recover-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<raise-error doc:name="Simulate timeout" type="HTTP:TIMEOUT" description="Simulated timeout" />
+				</circuit-breaker:execute>
+			</try>
+			<try doc:name="Blocked while open">
+				<error-handler>
+					<on-error-continue type="CIRCUIT-BREAKER:OPEN">
+						<set-variable doc:name="Record blocked" variableName="blockedWhileOpen" value="#[true]" />
+					</on-error-continue>
+				</error-handler>
+				<circuit-breaker:execute circuitBreakerKey="recover-test" windowSize="2" minimumCalls="2"
+					failureRateThreshold="50" resetTimeout="500" permittedCallsInHalfOpen="1" successThreshold="1"
+					failureErrorTypes="HTTP:TIMEOUT">
+					<set-payload doc:name="Should not run" value="#['should not run']" />
+				</circuit-breaker:execute>
+			</try>
+			<munit-tools:sleep doc:name="Wait past resetTimeout" time="600" timeUnit="MILLISECONDS" />
+			<circuit-breaker:execute doc:name="HALF_OPEN test call recovers" circuitBreakerKey="recover-test"
+				windowSize="2" minimumCalls="2" failureRateThreshold="50" resetTimeout="500"
+				permittedCallsInHalfOpen="1" successThreshold="1" failureErrorTypes="HTTP:TIMEOUT">
+				<set-payload doc:name="Simulate success" value="#['recovered']" />
+			</circuit-breaker:execute>
+		</munit:execution>
+		<munit:validation>
+			<munit-tools:assert-that doc:name="Was blocked while open" expression="#[vars.blockedWhileOpen]" is="#[MunitTools::equalTo(true)]" />
+			<munit-tools:assert-that doc:name="Recovered payload" expression="#[payload]" is="#[MunitTools::equalTo('recovered')]" />
+		</munit:validation>
+	</munit:test>
+</mule>
