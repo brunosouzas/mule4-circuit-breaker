@@ -13,19 +13,27 @@ import org.mule.runtime.api.store.ObjectStoreSettings;
 import org.mule.runtime.extension.api.annotation.Alias;
 
 /**
- * Default {@link CircuitStateStore} adapter, backed by the Mule runtime's own Object Store. Covers the
- * single-node case this plugin ships for (ADR-001); a shared/distributed adapter for multi-replica
- * deployments is a separate, later module that implements the same port.
+ * Default {@link CircuitStateStore} adapter, backed by the Mule runtime's own Object Store, configured as
+ * <b>persistent</b> (BRU-54). This is the same mechanism the Mule runtime uses to share data across
+ * CloudHub 2.0 replicas of one deployment: locally/standalone it persists to disk under the working
+ * directory; on CloudHub 2.0 the runtime backs it with its own managed, replica-shared implementation
+ * instead. No separate adapter class is needed for that — the port stays the same, only this one setting
+ * changes what backs it.
  *
  * <p>Every circuit's {@link CircuitSnapshot} is kept as a single value under one key in one shared,
- * non-persistent Object Store partition, so an atomic update is always "one lock, one key, one read, one
+ * persistent Object Store partition, so an atomic update is always "one lock, one key, one read, one
  * write" — never a multi-key operation that could leave a torn combination of state visible.
  *
- * <p>Concurrency: a {@link LockFactory} lock, keyed the same as the Object Store entry, serializes the
- * whole read-decide-write cycle per circuit key. This lock is node-local: on a multi-replica deployment,
- * each replica currently holds its own lock and its own store, so each replica's circuit is independently
- * consistent rather than shared. That gap is exactly what a future distributed adapter closes; it is not
- * addressed here.
+ * <p>Concurrency and consistency limits (see the README for the full write-up):
+ * <ul>
+ *   <li>The {@link LockFactory} lock below serializes reads/writes to a given circuit key <i>within one
+ *   replica</i>. It is not a distributed lock: two replicas writing to the same circuit key at the same
+ *   time race at the file/storage level, with no cross-replica coordination.</li>
+ *   <li>The very first time the {@code circuit-breaker-state} partition is created, if two replicas both
+ *   race to create it before either has persisted anything, the Mule runtime's persistent Object Store
+ *   implementation can let each replica create its own separate backing location — an unmitigated
+ *   runtime-internal behaviour, not something this adapter can coordinate around.</li>
+ * </ul>
  */
 @Alias("object-store")
 public class ObjectStoreCircuitStateStore implements CircuitStateStore {
@@ -70,6 +78,6 @@ public class ObjectStoreCircuitStateStore implements CircuitStateStore {
   @SuppressWarnings("unchecked")
   private ObjectStore<CircuitSnapshot> objectStore() {
     return objectStoreManager.getOrCreateObjectStore(OBJECT_STORE_NAME,
-        ObjectStoreSettings.builder().persistent(false).build());
+        ObjectStoreSettings.builder().persistent(true).build());
   }
 }

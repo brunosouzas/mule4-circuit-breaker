@@ -35,12 +35,14 @@
 		<mule.sdk.api.version>1.2.0</mule.sdk.api.version>
 		<mule.extensions.maven.plugin.version>1.9.6</mule.extensions.maven.plugin.version>
 		<mule.module.extensions.spring.support.version>4.9.1</mule.module.extensions.spring.support.version>
+		<mule.version>4.9.1</mule.version>
 		<slf4j.version>2.0.9</slf4j.version>
 
 		<munit.version>3.7.1</munit.version>
 		<munit.extensions.maven.plugin.version>1.7.2</munit.extensions.maven.plugin.version>
 		<munit.runtime.version>4.12.0</munit.runtime.version>
 		<junit.jupiter.version>5.10.2</junit.jupiter.version>
+		<mockito.version>5.11.0</mockito.version>
 
 		<maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
 		<maven.clean.plugin.version>3.4.0</maven.clean.plugin.version>
@@ -99,6 +101,22 @@
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter</artifactId>
 			<version>${junit.jupiter.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>${mockito.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Test-only: constructs the real persistent Object Store implementation directly (BRU-54's
+		     replica-sharing test) to prove the actual runtime mechanism, not a hand-rolled stand-in.
+		     Internal Mule Runtime API, not a public contract — see ReplicaSharedStateTest for the
+		     rationale and the version-coupling risk this accepts. -->
+		<dependency>
+			<groupId>org.mule.runtime</groupId>
+			<artifactId>mule-core</artifactId>
+			<version>${mule.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

@@ -35,10 +35,10 @@ import org.mule.runtime.extension.api.runtime.route.Chain;
  * validation rejects all three for this component shape) — so every tunable is a plain, attribute-only
  * parameter directly on {@code execute}, {@code circuitBreakerKey} is mandatory (there is no config to
  * default it from), and {@code failureErrorTypes} is a comma-separated string rather than a list. State
- * storage is fixed to the Object Store adapter for the same reason: the ADR's pluggable
- * {@code CircuitStateStore} port still exists and is still the seam BRU-54 will extend, just not as a
- * DSL-configurable parameter — a distributed adapter will need real integration code of its own regardless
- * of whether XML could select it.
+ * storage is fixed to the Object Store adapter for the same reason (not a DSL-configurable parameter) —
+ * see {@link com.brunosouzas.mule.extension.circuitbreaker.internal.store.ObjectStoreCircuitStateStore}
+ * for how that same adapter, configured persistent (BRU-54), shares state across CloudHub 2.0 replicas
+ * without needing a distributed-specific implementation.
  */
 public class CircuitBreakerOperations implements Initialisable {
 
