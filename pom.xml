@@ -177,41 +177,39 @@
 				<version>${maven.clean.plugin.version}</version>
 			</plugin>
 			<plugin>
-				<!-- The Exchange Maven Facade v3 (see distributionManagement above) doesn't accept a
-				     plain maven-deploy-plugin PUT: it needs the runId/eof/status-poll handshake that
-				     exchange-mule-maven-plugin implements below, or it answers 412 Precondition Failed.
-				     Disabling this default execution stops the plain PUT from running (and failing)
-				     alongside it. -->
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-deploy-plugin</artifactId>
-				<version>2.8.2</version>
-				<executions>
-					<execution>
-						<id>default-deploy</id>
-						<phase>none</phase>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<!-- Implements the Exchange Maven Facade v3 publish handshake for non-application assets
-				     (connectors/libraries): exchange-pre-deploy opens the deploy session, exchange-deploy
-				     uploads through it and polls until Exchange finishes ingesting the artifact. This is
-				     the org.mule.tools.maven plugin documented for connectors; mule-maven-plugin (used by
-				     mule-application projects, e.g. mulesoft-orders-api) provides the same handshake but
-				     only for mule-application packaging, not mule-extension.
+				     (connectors/libraries). mule-maven-plugin provides the same handshake, but only for
+				     mule-application packaging (see mulesoft-orders-api), not mule-extension.
 
-				     Both goals are bound to the deploy phase (pre-deploy declared first, so it runs
-				     first - same-phase executions run in declaration order) rather than the more common
-				     validate/deploy split, so they only run on an actual `mvn deploy`. ci.yml's plain
-				     `mvn package` (every branch/PR build) never reaches the deploy phase, so it stays
-				     untouched and doesn't pick up a dependency on Exchange being reachable. -->
+				     exchange-pre-deploy rewrites the project's distributionManagement repository URL in
+				     place to inject a runId - it doesn't upload anything itself. The plain
+				     maven-deploy-plugin default-deploy execution (bound to the deploy phase by
+				     mule-extension's packaging, left enabled, NOT overridden here) then uploads the
+				     actual .jar/.pom/-mule-plugin.jar to that now-runId-scoped URL. exchange-deploy
+				     (deploy phase, declared after default-deploy so it runs after it - Maven runs a
+				     phase's default-lifecycle-bound goals before explicitly-declared same-phase
+				     executions) uploads the closing exchange-eof.json marker and polls Exchange's
+				     status endpoint until it finishes ingesting the artifact.
+
+				     exchange-pre-deploy is bound to verify, not validate or deploy:
+				     - Binding it to deploy (same phase as default-deploy) is wrong: without the URL
+				       already rewritten before default-deploy runs, the actual artifacts upload to the
+				       plain (non-runId) URL, and exchange-deploy's eof/finalize call then 500s against
+				       a runId session that has no content - confirmed by trying it.
+				     - Binding it to validate makes it (a real, authenticated Exchange call) run on
+				       ci.yml's plain `mvn package` PR/branch builds too, since validate precedes
+				       package in the lifecycle - confirmed locally (accidentally) with a real 401-class
+				       failure ("User is not authorized...") from a `mvn package` run.
+				     - verify sits after package but before deploy: ci.yml's `mvn package` never reaches
+				       it, while `mvn deploy` (publish-snapshot.yml, release.yml) always runs through it
+				       on the way to the deploy phase, in time to rewrite the URL before default-deploy. -->
 				<groupId>org.mule.tools.maven</groupId>
 				<artifactId>exchange-mule-maven-plugin</artifactId>
 				<version>${exchange.mule.maven.plugin.version}</version>
 				<executions>
 					<execution>
 						<id>exchange-pre-deploy</id>
-						<phase>deploy</phase>
+						<phase>verify</phase>
 						<goals>
 							<goal>exchange-pre-deploy</goal>
 						</goals>
