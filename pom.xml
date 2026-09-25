@@ -35,6 +35,7 @@
 		<mule.extensions.api.version>1.9.18</mule.extensions.api.version>
 		<mule.sdk.api.version>1.2.0</mule.sdk.api.version>
 		<mule.extensions.maven.plugin.version>1.9.6</mule.extensions.maven.plugin.version>
+		<exchange.mule.maven.plugin.version>0.1.8</exchange.mule.maven.plugin.version>
 		<mule.module.extensions.spring.support.version>4.9.1</mule.module.extensions.spring.support.version>
 		<mule.version>4.9.1</mule.version>
 		<slf4j.version>2.0.9</slf4j.version>
@@ -55,6 +56,18 @@
 	</properties>
 
 	<repositories>
+		<!-- exchange-mule-maven-plugin's exchange-pre-deploy/exchange-deploy only inject the runId it
+		     needs into a <repositories> entry whose URL matches its own v3-without-organization regex
+		     (/api/v3/maven$, confirmed by disassembling ExchangeUriChecker) - the distributionManagement
+		     entry below (org-scoped, for uploads) doesn't count for this. Without this entry the plugin's
+		     own preConditions/status-check downloads fall through to mulesoft-releases and 404. Same URL
+		     mulesoft-orders-api uses. -->
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+			<layout>default</layout>
+		</repository>
 		<repository>
 			<id>mulesoft-releases</id>
 			<name>MuleSoft Releases Repository</name>
@@ -162,6 +175,61 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-clean-plugin</artifactId>
 				<version>${maven.clean.plugin.version}</version>
+			</plugin>
+			<plugin>
+				<!-- Implements the Exchange Maven Facade v3 publish handshake for non-application assets
+				     (connectors/libraries). mule-maven-plugin provides the same handshake, but only for
+				     mule-application packaging (see mulesoft-orders-api), not mule-extension.
+
+				     exchange-pre-deploy rewrites the project's distributionManagement repository URL in
+				     place to inject a runId - it doesn't upload anything itself. The plain
+				     maven-deploy-plugin default-deploy execution (bound to the deploy phase by
+				     mule-extension's packaging, left enabled, NOT overridden here) then uploads the
+				     actual .jar/.pom/-mule-plugin.jar to that now-runId-scoped URL. exchange-deploy
+				     (deploy phase, declared after default-deploy so it runs after it - Maven runs a
+				     phase's default-lifecycle-bound goals before explicitly-declared same-phase
+				     executions) uploads the closing exchange-eof.json marker and polls Exchange's
+				     status endpoint until it finishes ingesting the artifact.
+
+				     exchange-pre-deploy is bound to verify, not validate or deploy:
+				     - Binding it to deploy (same phase as default-deploy) is wrong: without the URL
+				       already rewritten before default-deploy runs, the actual artifacts upload to the
+				       plain (non-runId) URL, and exchange-deploy's eof/finalize call then 500s against
+				       a runId session that has no content - confirmed by trying it.
+				     - Binding it to validate makes it (a real, authenticated Exchange call) run on
+				       ci.yml's plain `mvn package` PR/branch builds too, since validate precedes
+				       package in the lifecycle - confirmed locally (accidentally) with a real 401-class
+				       failure ("User is not authorized...") from a `mvn package` run.
+				     - Binding it to verify has the same problem for a *different* build: this repo also
+				       has .github/workflows/build.yml, a plain GitHub Actions workflow (separate from
+				       the Azure DevOps pipeline) that runs `mvn -B verify` on push/PR to main - and
+				       unlike the Azure pipeline's "Build and package" job, that runner has no Exchange
+				       credentials configured at all. Confirmed by PR #10 (develop -> main) failing its
+				       GitHub Actions "test" check with 401 Unauthorized; PRs against develop never ran
+				       this workflow (it only triggers on main), which is why this didn't surface sooner.
+				     - install sits after both package and verify, still before deploy: neither ci.yml's
+				       `mvn package` nor build.yml's `mvn verify` ever reaches it, while `mvn deploy`
+				       (publish-snapshot.yml, release.yml) always runs through it on the way to the
+				       deploy phase, in time to rewrite the URL before default-deploy. -->
+				<groupId>org.mule.tools.maven</groupId>
+				<artifactId>exchange-mule-maven-plugin</artifactId>
+				<version>${exchange.mule.maven.plugin.version}</version>
+				<executions>
+					<execution>
+						<id>exchange-pre-deploy</id>
+						<phase>install</phase>
+						<goals>
+							<goal>exchange-pre-deploy</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>exchange-deploy</id>
+						<phase>deploy</phase>
+						<goals>
+							<goal>exchange-deploy</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
