@@ -200,16 +200,24 @@
 				       ci.yml's plain `mvn package` PR/branch builds too, since validate precedes
 				       package in the lifecycle - confirmed locally (accidentally) with a real 401-class
 				       failure ("User is not authorized...") from a `mvn package` run.
-				     - verify sits after package but before deploy: ci.yml's `mvn package` never reaches
-				       it, while `mvn deploy` (publish-snapshot.yml, release.yml) always runs through it
-				       on the way to the deploy phase, in time to rewrite the URL before default-deploy. -->
+				     - Binding it to verify has the same problem for a *different* build: this repo also
+				       has .github/workflows/build.yml, a plain GitHub Actions workflow (separate from
+				       the Azure DevOps pipeline) that runs `mvn -B verify` on push/PR to main - and
+				       unlike the Azure pipeline's "Build and package" job, that runner has no Exchange
+				       credentials configured at all. Confirmed by PR #10 (develop -> main) failing its
+				       GitHub Actions "test" check with 401 Unauthorized; PRs against develop never ran
+				       this workflow (it only triggers on main), which is why this didn't surface sooner.
+				     - install sits after both package and verify, still before deploy: neither ci.yml's
+				       `mvn package` nor build.yml's `mvn verify` ever reaches it, while `mvn deploy`
+				       (publish-snapshot.yml, release.yml) always runs through it on the way to the
+				       deploy phase, in time to rewrite the URL before default-deploy. -->
 				<groupId>org.mule.tools.maven</groupId>
 				<artifactId>exchange-mule-maven-plugin</artifactId>
 				<version>${exchange.mule.maven.plugin.version}</version>
 				<executions>
 					<execution>
 						<id>exchange-pre-deploy</id>
-						<phase>verify</phase>
+						<phase>install</phase>
 						<goals>
 							<goal>exchange-pre-deploy</goal>
 						</goals>
