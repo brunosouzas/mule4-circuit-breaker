@@ -64,6 +64,26 @@ mvn clean verify
 Runs the JUnit suite (state machine, error classification, storage, and the `execute` scope itself),
 packages the plugin, and gates on line coverage.
 
+## Exchange coordinates
+
+Published to the Anypoint Exchange of a personal Anypoint Developer Trial organization:
+
+```xml
+<dependency>
+    <groupId>c17ce335-be76-4fd0-87e2-130837d2c65a</groupId>
+    <artifactId>mule4-circuit-breaker</artifactId>
+    <version>1.0.0</version>
+    <classifier>mule-plugin</classifier>
+</dependency>
+```
+
+Publishing is reproducible and pipeline-only, never from a developer's machine: `azure-pipelines.yml`
+extends the [`azure-devops-mulesoft-pipelines`](https://github.com/brunosouzas/azure-devops-mulesoft-pipelines)
+GitFlow templates with `deploy: false` (this plugin has nothing to deploy to CloudHub 2.0). `develop`
+publishes the current `-SNAPSHOT` to Exchange; `main` runs a Maven release (tags `vx.y.z`, publishes the
+release, moves `main` to the next `-SNAPSHOT`). Credentials live only in the pipeline's Azure DevOps
+variable group, never in this repository.
+
 ## Retry-only vs circuit breaker: a reproducible demo
 
 `RetryVsCircuitBreakerDemoTest` (`src/test/java/.../circuitbreaker/internal/`) is a self-contained,
