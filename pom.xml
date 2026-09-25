@@ -56,6 +56,18 @@
 	</properties>
 
 	<repositories>
+		<!-- exchange-mule-maven-plugin's exchange-pre-deploy/exchange-deploy only inject the runId it
+		     needs into a <repositories> entry whose URL matches its own v3-without-organization regex
+		     (/api/v3/maven$, confirmed by disassembling ExchangeUriChecker) - the distributionManagement
+		     entry below (org-scoped, for uploads) doesn't count for this. Without this entry the plugin's
+		     own preConditions/status-check downloads fall through to mulesoft-releases and 404. Same URL
+		     mulesoft-orders-api uses. -->
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+			<layout>default</layout>
+		</repository>
 		<repository>
 			<id>mulesoft-releases</id>
 			<name>MuleSoft Releases Repository</name>
