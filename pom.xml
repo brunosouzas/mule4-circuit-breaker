@@ -20,8 +20,8 @@
 	</licenses>
 
 	<scm>
-		<connection>scm:git:git@github.com:brunosouzas/mule4-circuit-breaker.git</connection>
-		<developerConnection>scm:git:git@github.com:brunosouzas/mule4-circuit-breaker.git</developerConnection>
+		<connection>scm:git:https://github.com/brunosouzas/mule4-circuit-breaker.git</connection>
+		<developerConnection>scm:git:https://github.com/brunosouzas/mule4-circuit-breaker.git</developerConnection>
 		<url>https://github.com/brunosouzas/mule4-circuit-breaker</url>
 		<tag>HEAD</tag>
 	</scm>
