@@ -2,7 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.brunosouzas.mule</groupId>
+	<!-- groupId must be the Anypoint organization (business group) ID to publish to Exchange. -->
+	<groupId>c17ce335-be76-4fd0-87e2-130837d2c65a</groupId>
 	<artifactId>mule4-circuit-breaker</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<packaging>mule-extension</packaging>
@@ -48,6 +49,7 @@
 		<maven.clean.plugin.version>3.4.0</maven.clean.plugin.version>
 		<maven.resources.plugin.version>3.3.1</maven.resources.plugin.version>
 		<maven.antrun.plugin.version>3.1.0</maven.antrun.plugin.version>
+		<maven.release.plugin.version>3.3.1</maven.release.plugin.version>
 		<jacoco.maven.plugin.version>0.8.12</jacoco.maven.plugin.version>
 		<jacoco.coverage.minimum>0.80</jacoco.coverage.minimum>
 	</properties>
@@ -60,6 +62,21 @@
 			<layout>default</layout>
 		</repository>
 	</repositories>
+
+	<distributionManagement>
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/organizations/${project.groupId}/maven</url>
+			<layout>default</layout>
+		</repository>
+		<snapshotRepository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/organizations/${project.groupId}/maven</url>
+			<layout>default</layout>
+		</snapshotRepository>
+	</distributionManagement>
 
 	<pluginRepositories>
 		<pluginRepository>
@@ -141,6 +158,18 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-clean-plugin</artifactId>
 				<version>${maven.clean.plugin.version}</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-release-plugin</artifactId>
+				<version>${maven.release.plugin.version}</version>
+				<configuration>
+					<!-- [skip ci] stops the release commits from triggering the pipeline again. -->
+					<scmCommentPrefix>[skip ci] [maven-release-plugin] </scmCommentPrefix>
+					<tagNameFormat>v@{project.version}</tagNameFormat>
+					<goals>deploy</goals>
+					<pushChanges>true</pushChanges>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
