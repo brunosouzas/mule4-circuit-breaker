@@ -126,15 +126,19 @@
 			<version>${mockito.version}</version>
 			<scope>test</scope>
 		</dependency>
-		<!-- Test-only: constructs the real persistent Object Store implementation directly (BRU-54's
-		     replica-sharing test) to prove the actual runtime mechanism, not a hand-rolled stand-in.
-		     Internal Mule Runtime API, not a public contract — see ReplicaSharedStateTest for the
-		     rationale and the version-coupling risk this accepts. -->
+		<!-- "provided": supplied by the runtime container at deployment, not bundled in the plugin jar -
+		     same treatment as mule-api/mule-extensions-api/mule-sdk-api above. Needed at main scope (not
+		     just test) for ErrorClassifier to read the ErrorType off the event a MessagingException/
+		     EventProcessingException carries (org.mule.runtime.core.privileged.exception, the runtime's
+		     supported extension point for this, not an internal package) - see ErrorClassifier's javadoc.
+		     Also used, test-only, by BRU-54's ReplicaSharedStateTest to construct the real persistent
+		     Object Store implementation directly, to prove the actual runtime mechanism rather than a
+		     hand-rolled stand-in. -->
 		<dependency>
 			<groupId>org.mule.runtime</groupId>
 			<artifactId>mule-core</artifactId>
 			<version>${mule.version}</version>
-			<scope>test</scope>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.mulesoft.munit</groupId>
