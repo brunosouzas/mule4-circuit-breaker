@@ -20,8 +20,8 @@
 	</licenses>
 
 	<scm>
-		<connection>scm:git:git@github.com:brunosouzas/mule4-circuit-breaker.git</connection>
-		<developerConnection>scm:git:git@github.com:brunosouzas/mule4-circuit-breaker.git</developerConnection>
+		<connection>scm:git:https://github.com/brunosouzas/mule4-circuit-breaker.git</connection>
+		<developerConnection>scm:git:https://github.com/brunosouzas/mule4-circuit-breaker.git</developerConnection>
 		<url>https://github.com/brunosouzas/mule4-circuit-breaker</url>
 		<tag>HEAD</tag>
 	</scm>
@@ -35,6 +35,7 @@
 		<mule.extensions.api.version>1.9.18</mule.extensions.api.version>
 		<mule.sdk.api.version>1.2.0</mule.sdk.api.version>
 		<mule.extensions.maven.plugin.version>1.9.6</mule.extensions.maven.plugin.version>
+		<exchange.mule.maven.plugin.version>0.1.8</exchange.mule.maven.plugin.version>
 		<mule.module.extensions.spring.support.version>4.9.1</mule.module.extensions.spring.support.version>
 		<mule.version>4.9.1</mule.version>
 		<slf4j.version>2.0.9</slf4j.version>
@@ -162,6 +163,55 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-clean-plugin</artifactId>
 				<version>${maven.clean.plugin.version}</version>
+			</plugin>
+			<plugin>
+				<!-- The Exchange Maven Facade v3 (see distributionManagement above) doesn't accept a
+				     plain maven-deploy-plugin PUT: it needs the runId/eof/status-poll handshake that
+				     exchange-mule-maven-plugin implements below, or it answers 412 Precondition Failed.
+				     Disabling this default execution stops the plain PUT from running (and failing)
+				     alongside it. -->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-deploy-plugin</artifactId>
+				<version>2.8.2</version>
+				<executions>
+					<execution>
+						<id>default-deploy</id>
+						<phase>none</phase>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<!-- Implements the Exchange Maven Facade v3 publish handshake for non-application assets
+				     (connectors/libraries): exchange-pre-deploy opens the deploy session, exchange-deploy
+				     uploads through it and polls until Exchange finishes ingesting the artifact. This is
+				     the org.mule.tools.maven plugin documented for connectors; mule-maven-plugin (used by
+				     mule-application projects, e.g. mulesoft-orders-api) provides the same handshake but
+				     only for mule-application packaging, not mule-extension.
+
+				     Both goals are bound to the deploy phase (pre-deploy declared first, so it runs
+				     first - same-phase executions run in declaration order) rather than the more common
+				     validate/deploy split, so they only run on an actual `mvn deploy`. ci.yml's plain
+				     `mvn package` (every branch/PR build) never reaches the deploy phase, so it stays
+				     untouched and doesn't pick up a dependency on Exchange being reachable. -->
+				<groupId>org.mule.tools.maven</groupId>
+				<artifactId>exchange-mule-maven-plugin</artifactId>
+				<version>${exchange.mule.maven.plugin.version}</version>
+				<executions>
+					<execution>
+						<id>exchange-pre-deploy</id>
+						<phase>deploy</phase>
+						<goals>
+							<goal>exchange-pre-deploy</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>exchange-deploy</id>
+						<phase>deploy</phase>
+						<goals>
+							<goal>exchange-deploy</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
