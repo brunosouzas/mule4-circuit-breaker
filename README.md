@@ -64,6 +64,46 @@ mvn clean verify
 Runs the JUnit suite (state machine, error classification, storage, and the `execute` scope itself),
 packages the plugin, and gates on line coverage.
 
+## Retry-only vs circuit breaker: a reproducible demo
+
+`RetryVsCircuitBreakerDemoTest` (`src/test/java/.../circuitbreaker/internal/`) is a self-contained,
+deterministic comparison for anyone evaluating whether this plugin is worth adding on top of a plain retry
+loop. It simulates 20 requests arriving while a backend is down (`HTTP:TIMEOUT` on every call), run two
+ways:
+
+- **Retry only**: each request calls the backend directly, retrying up to 3 times with a fixed delay —
+  every request exhausts its retries against the still-broken backend.
+- **Retry + circuit breaker**: each request's call is wrapped in `circuit-breaker:execute` (called directly
+  as a plain Java method, same rationale as `CircuitBreakerOperationsTest` — see the environment note in
+  `pom.xml`). The first 5 requests feed the sliding window and trip the circuit; the remaining 15 get
+  `CIRCUIT-BREAKER:OPEN` immediately, without the backend ever being called again.
+
+There is no standalone Mule runtime in this environment (the same limitation documented in `pom.xml` for
+the disabled MUnit execution), so this demo runs as a plain JUnit test instead of a deployed Mule
+application — no code under `src/main` is involved beyond the `execute` scope itself.
+
+Reproduce it with:
+
+```
+mvn test -Dtest=RetryVsCircuitBreakerDemoTest
+```
+
+Representative output from an actual run:
+
+```
+scenario=RETRY_ONLY request=1/20 outcome=FAILURE backendInvocationsSoFar=3
+...
+scenario=RETRY_ONLY summary backendInvocations=60 elapsedMillis=1929 success=0 failure=20
+scenario=CIRCUIT_BREAKER request=6/20 outcome=CIRCUIT_OPEN backendInvocationsSoFar=5
+...
+scenario=CIRCUIT_BREAKER summary backendInvocations=5 elapsedMillis=139 success=0 failure=5 circuitOpen=15
+COMPARISON backendInvocations retryOnly=60 circuitBreaker=5 ; elapsedMillis retryOnly=1929 circuitBreaker=139
+```
+
+The test doesn't rely on eyeballing that output: it asserts the contrast mechanically — total backend
+invocations and total elapsed time for the circuit-breaker run are both strictly lower than for the
+retry-only run — so a green `mvn test` run is itself the evidence.
+
 ## Licence
 
 [MIT](LICENSE)
