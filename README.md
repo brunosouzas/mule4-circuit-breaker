@@ -50,10 +50,22 @@ what the runtime plugs in underneath. That gives real cross-replica visibility, 
   key — they silently diverge instead of erroring. This is runtime-internal behaviour this plugin cannot
   coordinate around; it only matters for a circuit's very first write, not for calls afterward. Verified by
   reading the runtime's own `PartitionedPersistentObjectStore`/`PersistentObjectStorePartition` classes
-  (see `ReplicaSharedStateTest`), not assumed.
+  (see `ReplicaSharedStateTest`), not assumed. On a real CloudHub 2.0 deployment (2 replicas), sending two
+  concurrent first requests for a brand-new key produced no visible error, but the circuit needed more real
+  failures than configured to open afterward (8 instead of 5) — consistent with this limit, though not
+  provable from outside a pod; see
+  [`mule4-circuit-breaker-demo-app`'s evidence](https://github.com/brunosouzas/mule4-circuit-breaker-demo-app/blob/2d69847/evidence/BRU-58/first-write-concurrency.md).
 - **Latency.** Persistent Object Store I/O (local disk, or CloudHub 2.0's managed backend over the
-  network) is slower than the in-memory store this plugin used before BRU-54. Not measured here — this
-  project has no CloudHub 2.0 access to benchmark the real network case against.
+  network) is slower than the in-memory store this plugin used before BRU-54. Measured on a real CloudHub
+  2.0 deployment (2 replicas, 0.1 vCore each): **+5.6 ms median** (+5.0 ms mean, +2.3 ms p95) per
+  `circuit-breaker:execute` call, isolated by comparing an endpoint that goes through the circuit breaker
+  against an identical one that doesn't. That's the cost of 4 Object Store operations
+  (`CircuitBreakerOperations.execute()` calls `stateStore.update()` twice per invocation, each doing a
+  locked read + write) against CloudHub 2.0's managed backend, under otherwise idle load — not a number for
+  the Object Store's behaviour under concurrent load from many replicas at once, which this measurement
+  didn't exercise. Method, raw samples and cross-replica proof:
+  [`mule4-circuit-breaker-demo-app`'s evidence](https://github.com/brunosouzas/mule4-circuit-breaker-demo-app/blob/2d69847/evidence/BRU-58/latency-summary.md)
+  (BRU-58).
 
 ## Build and test
 
