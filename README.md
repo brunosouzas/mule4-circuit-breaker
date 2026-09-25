@@ -67,6 +67,34 @@ what the runtime plugs in underneath. That gives real cross-replica visibility, 
   [`mule4-circuit-breaker-demo-app`'s evidence](https://github.com/brunosouzas/mule4-circuit-breaker-demo-app/blob/2d69847/evidence/BRU-58/latency-summary.md)
   (BRU-58).
 
+## Error classification and the privileged API
+
+`ErrorClassifier` (`internal/classify/ErrorClassifier.java`) reads the `ErrorType` of a failed call
+through `org.mule.runtime.core.privileged.exception.EventProcessingException`/`MessagingException` for
+exactly one step: getting from the `Throwable` the `Chain`'s error callback hands back to the `Event` it
+carries. Everything past that point is the runtime's public, supported contract —
+`Event#getError()` (`org.mule.runtime.api.event.Event`) and `Error#getErrorType()`
+(`org.mule.runtime.api.message.Error`).
+
+This is deliberate, not an oversight left for a future cleanup. Both shapes of the operation's `Chain`
+error callback — `org.mule.runtime.extension.api.runtime.route.Chain#process` (legacy) and
+`org.mule.sdk.api.runtime.route.Chain#process` (current SDK) — only ever hand the callback a bare
+`java.lang.Throwable`; neither one, nor `CompletionCallback.error` in either package, exposes a `Result`,
+`Error`, `ErrorType` or `Event` directly. Verified by decompiling the exact jars this project resolves
+(`mule-extensions-api:1.9.18`, `mule-sdk-api:1.2.0`), not assumed. In a deployed flow that `Throwable` is
+in practice a `MessagingException` (BRU-60's finding). So there is no way to reach a call's `ErrorType`
+using only the Mule SDK's public API surface — reading it always requires this one privileged-package
+step.
+
+The concrete risk: `org.mule.runtime.core.privileged.exception` is not part of the SDK's compatibility
+guarantee and can change shape between runtime versions without notice — unlike `mule-api`/
+`mule-extensions-api`/`mule-sdk-api`, which are pinned by this plugin's own POM, `mule-core` is `provided`
+and in practice tracks whatever runtime version the deployment target actually ships, not
+`${mule.version}` (currently `4.9.1`) fixed here for build/test. `ErrorClassifierTest`'s
+`configuredTypeCountsAsFailureWhenCarriedByTheEventOfAMessagingException` test pins today's real shape as
+a regression check specifically so that a runtime change here fails the build loudly instead of silently
+reintroducing BRU-60 (a circuit that never opens).
+
 ## Build and test
 
 ```

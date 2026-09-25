@@ -5,7 +5,7 @@
 	<!-- groupId must be the Anypoint organization (business group) ID to publish to Exchange. -->
 	<groupId>c17ce335-be76-4fd0-87e2-130837d2c65a</groupId>
 	<artifactId>mule4-circuit-breaker</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>1.2.0-SNAPSHOT</version>
 	<packaging>mule-extension</packaging>
 
 	<name>Circuit Breaker Extension for Mule 4</name>
