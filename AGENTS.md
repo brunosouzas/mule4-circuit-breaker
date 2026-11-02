@@ -4,6 +4,19 @@
 
 A circuit breaker plugin for Mule 4, written from scratch. It opens the circuit when a backend keeps failing on a sliding-window failure rate. State is kept in the Mule runtime's own persistent Object Store, the same mechanism CloudHub 2.0 uses to share data across an app's replicas — so a circuit opened by one replica is visible to the others, with the limits documented below.
 
+## Technology
+
+Stack: Java 17, Mule SDK, Mule 4, MUnit, Maven, Azure Pipelines, GitHub Actions
+Delivery: C environments (a plugin: the pipeline runs with `deploy: false`, so it publishes to Exchange and deploys nothing)
+Integration branch: `develop`
+Data: none
+Article: `50-writing/circuit-breaker-in-mulesoft/`
+
+- Build: `mvn -B verify`
+- Test: `mvn -B verify` (JUnit; the MUnit DSL suite is not run by it, see README.md)
+- Run locally: `not applicable: a plugin; run it through mule4-circuit-breaker-demo-app`
+- Deliver and verify: `a merge into develop runs the Azure Pipelines GitFlow template (azure-devops-mulesoft-pipelines, pinned tag, deploy: false): build and publish x.y.z-SNAPSHOT to Exchange; a release/x.y.z pull request into main runs the Maven release and publishes vX.Y.Z to Exchange; verify the version is on Exchange and the GitHub Actions build is green on the merge commit`
+
 ## Technology declarations
 
 - `java.version = 17` — [pom.xml](pom.xml).
@@ -34,3 +47,8 @@ GitHub default branch inspected on 2026-10-06: `main`. This context is prepared 
 ## Project rules
 
 Before planning, reviewing or changing this project, read [the applicable project rules](rules/README.md).
+
+- Article repository: this repository was made for a published article and keeps what the article published (its code, branches and pipeline). A change here changes the article, so every merge is Bruno's (level 2), also under a delegation.
+- Board area: `mulesoft` (Azure Boards, project `brunosouzas`).
+- OpenSpec: no: every change takes the small path.
+- Branches follow GitFlow as published: changes go to `develop`; `main` only through a `release/` or `hotfix/` pull request, because a merge into `main` runs the Maven release.
