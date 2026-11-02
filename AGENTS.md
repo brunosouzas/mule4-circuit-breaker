@@ -15,7 +15,7 @@ Article: `50-writing/circuit-breaker-in-mulesoft/`
 - Build: `mvn -B verify`
 - Test: `mvn -B verify` (JUnit; the MUnit DSL suite is not run by it, see README.md)
 - Run locally: `not applicable: a plugin; run it through mule4-circuit-breaker-demo-app`
-- Deliver and verify: `a merge into develop runs the Azure Pipelines GitFlow template (azure-devops-mulesoft-pipelines, pinned tag, deploy: false): build and publish x.y.z-SNAPSHOT to Exchange; a release/x.y.z pull request into main runs the Maven release and publishes vX.Y.Z to Exchange; verify the version is on Exchange and the GitHub Actions build is green on the merge commit`
+- Deliver and verify: `a merge into develop runs the Azure Pipelines GitFlow template (azure-devops-mulesoft-pipelines, pinned tag, deploy: false): build and publish x.y.z-SNAPSHOT to Exchange; a release/x.y.z pull request into main runs the Maven release and publishes vX.Y.Z to Exchange; after a release into main, the GitHub Actions build is green on main; after a merge into develop, the Azure Pipelines run is green and the SNAPSHOT is on Exchange; the links the article cites still resolve`
 
 ## Technology declarations
 
