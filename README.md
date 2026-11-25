@@ -104,25 +104,40 @@ mvn clean verify
 Runs the JUnit suite (state machine, error classification, storage, and the `execute` scope itself),
 packages the plugin, and gates on line coverage.
 
-## Exchange coordinates
+## Use it in an application
 
-Published to the Anypoint Exchange of a personal Anypoint Developer Trial organization:
+Build the plugin from its tag, then depend on it; no Anypoint account is needed:
+
+```bash
+git clone --branch v2.0.0 https://github.com/brunosouzas/mule4-circuit-breaker.git
+mvn -f mule4-circuit-breaker/pom.xml -DskipTests install
+```
 
 ```xml
 <dependency>
-    <groupId>c17ce335-be76-4fd0-87e2-130837d2c65a</groupId>
+    <groupId>com.brunosouzas.mulesoft</groupId>
     <artifactId>mule4-circuit-breaker</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <classifier>mule-plugin</classifier>
 </dependency>
 ```
 
-Publishing is reproducible and pipeline-only, never from a developer's machine: `azure-pipelines.yml`
-extends the [`azure-devops-mulesoft-pipelines`](https://github.com/brunosouzas/azure-devops-mulesoft-pipelines)
-GitFlow templates with `deploy: false` (this plugin has nothing to deploy to CloudHub 2.0). `develop`
-publishes the current `-SNAPSHOT` to Exchange; `main` runs a Maven release (tags `vx.y.z`, publishes the
-release, moves `main` to the next `-SNAPSHOT`). Credentials live only in the pipeline's Azure DevOps
-variable group, never in this repository.
+Each release is also published to the Anypoint Exchange of the author's trial organisation, under that
+organisation's ID as groupId.
+
+## Delivery
+
+GitHub Actions, with the reusable workflow `mulesoft-library.yml` of
+[github-reusable-workflows](https://github.com/brunosouzas/github-reusable-workflows) (its
+`mulesoft/README.md` has the whole process):
+
+- a pull request into `main` builds and runs the JUnit suite, with no secret;
+- merging it is the release: `release:prepare` tags `vX.Y.Z` and moves `main` to the next patch
+  `-SNAPSHOT`, then the tag is published to Exchange and gets a GitHub release. A minor or a major is set
+  in the pull request itself (for example `2.1.0-SNAPSHOT`).
+
+Versions 1.x were delivered by the Azure DevOps GitFlow pipeline the first article describes; their tags
+(`v1.0.0`, `v1.1.0`) still hold that pipeline.
 
 ## Retry-only vs circuit breaker: a reproducible demo
 

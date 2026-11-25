@@ -18,8 +18,8 @@ Keep project facts in AGENTS.md and obligations in this rules index. Reusable pr
 
 Project-specific operation/release sources (paths relative to repository root):
 
-- [azure-pipelines.yml](../azure-pipelines.yml).
+- [.github/workflows/delivery.yml](../.github/workflows/delivery.yml).
 
 ## Integration and release boundary
 
-This instruction-only task targets develop, following the existing integration/publishing workflow. Do not merge it directly into the main release line or change branch defaults. Preserve the repository's own promotion process. Push, PR validation or integration merges can invoke platform pipelines; state the actual trigger consequences before delivery. Approval for context files is not authorization to publish an Exchange asset or deploy an application.
+Changes target `main` by pull request; merging one releases the plugin. Preserve the repository's own promotion process. Push, PR validation or integration merges can invoke platform pipelines; state the actual trigger consequences before delivery. Approval for context files is not authorization to publish an Exchange asset or deploy an application.

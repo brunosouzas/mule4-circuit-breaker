@@ -2,10 +2,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<!-- groupId must be the Anypoint organization (business group) ID to publish to Exchange. -->
-	<groupId>c17ce335-be76-4fd0-87e2-130837d2c65a</groupId>
+	<!-- The canonical groupId. Exchange takes an asset only under its organisation's ID, so the release
+	     workflow replaces it with that ID in the checkout of the tag it publishes, and nothing commits it. -->
+	<groupId>com.brunosouzas.mulesoft</groupId>
 	<artifactId>mule4-circuit-breaker</artifactId>
-	<version>1.2.0-SNAPSHOT</version>
+	<version>2.0.0-SNAPSHOT</version>
 	<packaging>mule-extension</packaging>
 
 	<name>Circuit Breaker Extension for Mule 4</name>
@@ -177,69 +178,14 @@
 				<version>${maven.clean.plugin.version}</version>
 			</plugin>
 			<plugin>
-				<!-- Implements the Exchange Maven Facade v3 publish handshake for non-application assets
-				     (connectors/libraries). mule-maven-plugin provides the same handshake, but only for
-				     mule-application packaging (see mulesoft-orders-api), not mule-extension.
-
-				     exchange-pre-deploy rewrites the project's distributionManagement repository URL in
-				     place to inject a runId - it doesn't upload anything itself. The plain
-				     maven-deploy-plugin default-deploy execution (bound to the deploy phase by
-				     mule-extension's packaging, left enabled, NOT overridden here) then uploads the
-				     actual .jar/.pom/-mule-plugin.jar to that now-runId-scoped URL. exchange-deploy
-				     (deploy phase, declared after default-deploy so it runs after it - Maven runs a
-				     phase's default-lifecycle-bound goals before explicitly-declared same-phase
-				     executions) uploads the closing exchange-eof.json marker and polls Exchange's
-				     status endpoint until it finishes ingesting the artifact.
-
-				     exchange-pre-deploy is bound to verify, not validate or deploy:
-				     - Binding it to deploy (same phase as default-deploy) is wrong: without the URL
-				       already rewritten before default-deploy runs, the actual artifacts upload to the
-				       plain (non-runId) URL, and exchange-deploy's eof/finalize call then 500s against
-				       a runId session that has no content - confirmed by trying it.
-				     - Binding it to validate makes it (a real, authenticated Exchange call) run on
-				       ci.yml's plain `mvn package` PR/branch builds too, since validate precedes
-				       package in the lifecycle - confirmed locally (accidentally) with a real 401-class
-				       failure ("User is not authorized...") from a `mvn package` run.
-				     - Binding it to verify has the same problem for a *different* build: this repo also
-				       has .github/workflows/build.yml, a plain GitHub Actions workflow (separate from
-				       the Azure DevOps pipeline) that runs `mvn -B verify` on push/PR to main - and
-				       unlike the Azure pipeline's "Build and package" job, that runner has no Exchange
-				       credentials configured at all. Confirmed by PR #10 (develop -> main) failing its
-				       GitHub Actions "test" check with 401 Unauthorized; PRs against develop never ran
-				       this workflow (it only triggers on main), which is why this didn't surface sooner.
-				     - install sits after both package and verify, still before deploy: neither ci.yml's
-				       `mvn package` nor build.yml's `mvn verify` ever reaches it, while `mvn deploy`
-				       (publish-snapshot.yml, release.yml) always runs through it on the way to the
-				       deploy phase, in time to rewrite the URL before default-deploy. -->
-				<groupId>org.mule.tools.maven</groupId>
-				<artifactId>exchange-mule-maven-plugin</artifactId>
-				<version>${exchange.mule.maven.plugin.version}</version>
-				<executions>
-					<execution>
-						<id>exchange-pre-deploy</id>
-						<phase>install</phase>
-						<goals>
-							<goal>exchange-pre-deploy</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>exchange-deploy</id>
-						<phase>deploy</phase>
-						<goals>
-							<goal>exchange-deploy</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-release-plugin</artifactId>
 				<version>${maven.release.plugin.version}</version>
 				<configuration>
-					<!-- [skip ci] stops the release commits from triggering the pipeline again. -->
+					<!-- release:prepare only (the release workflow publishes the tag itself). [skip ci]: a
+					     library releases on every merge, so neither release commit runs the workflow again. -->
 					<scmCommentPrefix>[skip ci] [maven-release-plugin] </scmCommentPrefix>
 					<tagNameFormat>v@{project.version}</tagNameFormat>
-					<goals>deploy</goals>
 					<pushChanges>true</pushChanges>
 				</configuration>
 			</plugin>
@@ -406,4 +352,55 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!-- exchange: the Exchange publish goals, active only in the release workflow (-Pexchange), so a plain
+		     `mvn install` needs no Anypoint account (mule4-circuit-breaker-demo-app builds this plugin from
+		     its tag). -->
+		<profile>
+			<id>exchange</id>
+			<build>
+				<plugins>
+					<plugin>
+						<!-- Implements the Exchange Maven Facade v3 publish handshake for non-application assets
+						     (connectors/libraries). mule-maven-plugin provides the same handshake, but only for
+						     mule-application packaging (see mulesoft-orders-api), not mule-extension.
+
+						     exchange-pre-deploy rewrites the project's distributionManagement repository URL in
+						     place to inject a runId - it doesn't upload anything itself. The plain
+						     maven-deploy-plugin default-deploy execution (bound to the deploy phase by
+						     mule-extension's packaging, left enabled, NOT overridden here) then uploads the
+						     actual .jar/.pom/-mule-plugin.jar to that now-runId-scoped URL. exchange-deploy
+						     (deploy phase, declared after default-deploy so it runs after it - Maven runs a
+						     phase's default-lifecycle-bound goals before explicitly-declared same-phase
+						     executions) uploads the closing exchange-eof.json marker and polls Exchange's
+						     status endpoint until it finishes ingesting the artifact.
+
+						     exchange-pre-deploy is bound to install, before deploy: bound to deploy, the artifacts
+						     would upload before the URL holds the runId, and exchange-deploy's eof call then 500s;
+						     the profile keeps this authenticated call out of every build but the release's. -->
+						<groupId>org.mule.tools.maven</groupId>
+						<artifactId>exchange-mule-maven-plugin</artifactId>
+						<version>${exchange.mule.maven.plugin.version}</version>
+						<executions>
+							<execution>
+								<id>exchange-pre-deploy</id>
+								<phase>install</phase>
+								<goals>
+									<goal>exchange-pre-deploy</goal>
+								</goals>
+							</execution>
+							<execution>
+								<id>exchange-deploy</id>
+								<phase>deploy</phase>
+								<goals>
+									<goal>exchange-deploy</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>

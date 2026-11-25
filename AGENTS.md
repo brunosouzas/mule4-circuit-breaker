@@ -6,16 +6,18 @@ A circuit breaker plugin for Mule 4, written from scratch. It opens the circuit 
 
 ## Technology
 
-Stack: Java 17, Mule SDK, Mule 4, MUnit, Maven, Azure Pipelines, GitHub Actions
-Delivery: C environments (a plugin: the pipeline runs with `deploy: false`, so it publishes to Exchange and deploys nothing)
-Integration branch: `develop`
+Stack: Java 17, Mule SDK, Mule 4, MUnit, Maven, GitHub Actions
+Delivery: B package
+Integration branch: `main`
 Data: none
 Article: `50-writing/circuit-breaker-in-mulesoft/`
+Approver: brunosouzas
+Tracker: Linear brunosouzas, team SW, label mulesoft
 
 - Build: `mvn -B verify`
 - Test: `mvn -B verify` (JUnit; the MUnit DSL suite is not run by it, see README.md)
-- Run locally: `not applicable: a plugin; run it through mule4-circuit-breaker-demo-app`
-- Deliver and verify: `a merge into develop runs the Azure Pipelines GitFlow template (azure-devops-mulesoft-pipelines, pinned tag, deploy: false): build and publish x.y.z-SNAPSHOT to Exchange; a release/x.y.z pull request into main runs the Maven release and publishes vX.Y.Z to Exchange; after a release into main, the GitHub Actions build is green on main; after a merge into develop, the Azure Pipelines run is green and the SNAPSHOT is on Exchange; the links the article cites still resolve`
+- Run locally: not applicable: a plugin; run it through mule4-circuit-breaker-demo-app
+- Deliver and verify: a merge into `main` runs `.github/workflows/delivery.yml` (the reusable `mulesoft-library.yml` of github-reusable-workflows, pinned by SHA): the `library / release` job is green, the tag `vX.Y.Z` and its GitHub release exist, and the version is on the Exchange of the trial organisation; the links the articles cite still resolve
 
 ## Technology declarations
 
@@ -39,16 +41,14 @@ Top-level source/documentation directories: `src`.
 
 - [README.md](README.md).
 - [pom.xml](pom.xml).
-- [.github/workflows/build.yml](.github/workflows/build.yml).
-- [azure-pipelines.yml](azure-pipelines.yml).
+- [.github/workflows/delivery.yml](.github/workflows/delivery.yml).
 
-GitHub default branch inspected on 2026-10-06: `main`. This context is prepared against develop, the integration line selected from the project pipeline/release sources. The GitHub default is separately main. Build/publish commands mentioned by those sources are context, not authorization.
+GitHub default branch inspected on 2026-10-06: `main`. Since 2.0.0 the integration line is `main`; `develop` belongs to the 1.x GitFlow delivery. Build/publish commands mentioned by those sources are context, not authorization.
 
 ## Project rules
 
 Before planning, reviewing or changing this project, read [the applicable project rules](rules/README.md).
 
 - Article repository: this repository was made for a published article and keeps what the article published (its code, branches and pipeline). A change here changes the article, so every merge is Bruno's (level 2), also under a delegation.
-- Board area: `mulesoft` (Azure Boards, project `brunosouzas`).
 - OpenSpec: no: every change takes the small path.
-- Branches follow GitFlow as published: changes go to `develop`; `main` only through a `release/` or `hotfix/` pull request, because a merge into `main` runs the Maven release.
+- Branches since 2.0.0: a change is a pull request from `feature/sw-<n>-<slug>` into `main`, squash-merged with a message written by hand and no skip-CI marker; merging it releases the plugin. The 1.x tags keep the Azure DevOps GitFlow pipeline the first article series describes; never move or delete them.
