@@ -6,7 +6,7 @@
 	     workflow replaces it with that ID in the checkout of the tag it publishes, and nothing commits it. -->
 	<groupId>com.brunosouzas.mulesoft</groupId>
 	<artifactId>mule4-circuit-breaker</artifactId>
-	<version>2.0.0-SNAPSHOT</version>
+	<version>2.0.0</version>
 	<packaging>mule-extension</packaging>
 
 	<name>Circuit Breaker Extension for Mule 4</name>
@@ -24,7 +24,7 @@
 		<connection>scm:git:https://github.com/brunosouzas/mule4-circuit-breaker.git</connection>
 		<developerConnection>scm:git:https://github.com/brunosouzas/mule4-circuit-breaker.git</developerConnection>
 		<url>https://github.com/brunosouzas/mule4-circuit-breaker</url>
-		<tag>HEAD</tag>
+		<tag>v2.0.0</tag>
 	</scm>
 
 	<properties>
