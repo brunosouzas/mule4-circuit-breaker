@@ -13,7 +13,7 @@ permissions: {}
 
 jobs:
   library:
-    uses: brunosouzas/github-reusable-workflows/.github/workflows/mulesoft-library.yml@15bb1a7b36ac0df8198f0b597bd9503afe191469 # feature/sw-206-mulesoft
+    uses: brunosouzas/github-reusable-workflows/.github/workflows/mulesoft-library.yml@82c6b5d4fb494d167e7d451343eaba39e7dfd87e # v0.2.0
     permissions:
       contents: read
     secrets:
