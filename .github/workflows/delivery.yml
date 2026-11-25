@@ -1,0 +1,21 @@
+name: delivery
+
+# The delivery of this plugin: a pull request into main builds and tests it; merging it releases it
+# (the Maven release, the tag vX.Y.Z, the version on the Anypoint Exchange, a GitHub release).
+# The steps live in brunosouzas/github-reusable-workflows, pinned by commit SHA (mulesoft/README.md there).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  library:
+    uses: brunosouzas/github-reusable-workflows/.github/workflows/mulesoft-library.yml@82c6b5d4fb494d167e7d451343eaba39e7dfd87e # v0.2.0
+    permissions:
+      contents: read
+    secrets:
+      ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

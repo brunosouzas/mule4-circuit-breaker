@@ -50,10 +50,50 @@ what the runtime plugs in underneath. That gives real cross-replica visibility, 
   key — they silently diverge instead of erroring. This is runtime-internal behaviour this plugin cannot
   coordinate around; it only matters for a circuit's very first write, not for calls afterward. Verified by
   reading the runtime's own `PartitionedPersistentObjectStore`/`PersistentObjectStorePartition` classes
-  (see `ReplicaSharedStateTest`), not assumed.
+  (see `ReplicaSharedStateTest`), not assumed. On a real CloudHub 2.0 deployment (2 replicas), sending two
+  concurrent first requests for a brand-new key produced no visible error, but the circuit needed more real
+  failures than configured to open afterward (8 instead of 5) — consistent with this limit, though not
+  provable from outside a pod; see
+  [`mule4-circuit-breaker-demo-app`'s evidence](https://github.com/brunosouzas/mule4-circuit-breaker-demo-app/blob/2d69847/evidence/BRU-58/first-write-concurrency.md).
 - **Latency.** Persistent Object Store I/O (local disk, or CloudHub 2.0's managed backend over the
-  network) is slower than the in-memory store this plugin used before BRU-54. Not measured here — this
-  project has no CloudHub 2.0 access to benchmark the real network case against.
+  network) is slower than the in-memory store this plugin used before BRU-54. Measured on a real CloudHub
+  2.0 deployment (2 replicas, 0.1 vCore each): **+5.6 ms median** (+5.0 ms mean, +2.3 ms p95) per
+  `circuit-breaker:execute` call, isolated by comparing an endpoint that goes through the circuit breaker
+  against an identical one that doesn't. That's the cost of 4 Object Store operations
+  (`CircuitBreakerOperations.execute()` calls `stateStore.update()` twice per invocation, each doing a
+  locked read + write) against CloudHub 2.0's managed backend, under otherwise idle load — not a number for
+  the Object Store's behaviour under concurrent load from many replicas at once, which this measurement
+  didn't exercise. Method, raw samples and cross-replica proof:
+  [`mule4-circuit-breaker-demo-app`'s evidence](https://github.com/brunosouzas/mule4-circuit-breaker-demo-app/blob/2d69847/evidence/BRU-58/latency-summary.md)
+  (BRU-58).
+
+## Error classification and the privileged API
+
+`ErrorClassifier` (`internal/classify/ErrorClassifier.java`) reads the `ErrorType` of a failed call
+through `org.mule.runtime.core.privileged.exception.EventProcessingException`/`MessagingException` for
+exactly one step: getting from the `Throwable` the `Chain`'s error callback hands back to the `Event` it
+carries. Everything past that point is the runtime's public, supported contract —
+`Event#getError()` (`org.mule.runtime.api.event.Event`) and `Error#getErrorType()`
+(`org.mule.runtime.api.message.Error`).
+
+This is deliberate, not an oversight left for a future cleanup. Both shapes of the operation's `Chain`
+error callback — `org.mule.runtime.extension.api.runtime.route.Chain#process` (legacy) and
+`org.mule.sdk.api.runtime.route.Chain#process` (current SDK) — only ever hand the callback a bare
+`java.lang.Throwable`; neither one, nor `CompletionCallback.error` in either package, exposes a `Result`,
+`Error`, `ErrorType` or `Event` directly. Verified by decompiling the exact jars this project resolves
+(`mule-extensions-api:1.9.18`, `mule-sdk-api:1.2.0`), not assumed. In a deployed flow that `Throwable` is
+in practice a `MessagingException` (BRU-60's finding). So there is no way to reach a call's `ErrorType`
+using only the Mule SDK's public API surface — reading it always requires this one privileged-package
+step.
+
+The concrete risk: `org.mule.runtime.core.privileged.exception` is not part of the SDK's compatibility
+guarantee and can change shape between runtime versions without notice — unlike `mule-api`/
+`mule-extensions-api`/`mule-sdk-api`, which are pinned by this plugin's own POM, `mule-core` is `provided`
+and in practice tracks whatever runtime version the deployment target actually ships, not
+`${mule.version}` (currently `4.9.1`) fixed here for build/test. `ErrorClassifierTest`'s
+`configuredTypeCountsAsFailureWhenCarriedByTheEventOfAMessagingException` test pins today's real shape as
+a regression check specifically so that a runtime change here fails the build loudly instead of silently
+reintroducing BRU-60 (a circuit that never opens).
 
 ## Build and test
 
@@ -64,25 +104,40 @@ mvn clean verify
 Runs the JUnit suite (state machine, error classification, storage, and the `execute` scope itself),
 packages the plugin, and gates on line coverage.
 
-## Exchange coordinates
+## Use it in an application
 
-Published to the Anypoint Exchange of a personal Anypoint Developer Trial organization:
+Build the plugin from its tag, then depend on it; no Anypoint account is needed:
+
+```bash
+git clone --branch v2.0.0 https://github.com/brunosouzas/mule4-circuit-breaker.git
+mvn -f mule4-circuit-breaker/pom.xml -DskipTests install
+```
 
 ```xml
 <dependency>
-    <groupId>c17ce335-be76-4fd0-87e2-130837d2c65a</groupId>
+    <groupId>com.brunosouzas.mulesoft</groupId>
     <artifactId>mule4-circuit-breaker</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <classifier>mule-plugin</classifier>
 </dependency>
 ```
 
-Publishing is reproducible and pipeline-only, never from a developer's machine: `azure-pipelines.yml`
-extends the [`azure-devops-mulesoft-pipelines`](https://github.com/brunosouzas/azure-devops-mulesoft-pipelines)
-GitFlow templates with `deploy: false` (this plugin has nothing to deploy to CloudHub 2.0). `develop`
-publishes the current `-SNAPSHOT` to Exchange; `main` runs a Maven release (tags `vx.y.z`, publishes the
-release, moves `main` to the next `-SNAPSHOT`). Credentials live only in the pipeline's Azure DevOps
-variable group, never in this repository.
+Each release is also published to the Anypoint Exchange of the author's trial organisation, under that
+organisation's ID as groupId.
+
+## Delivery
+
+GitHub Actions, with the reusable workflow `mulesoft-library.yml` of
+[github-reusable-workflows](https://github.com/brunosouzas/github-reusable-workflows) (its
+`mulesoft/README.md` has the whole process):
+
+- a pull request into `main` builds and runs the JUnit suite, with no secret;
+- merging it is the release: `release:prepare` tags `vX.Y.Z` and moves `main` to the next patch
+  `-SNAPSHOT`, then the tag is published to Exchange and gets a GitHub release. A minor or a major is set
+  in the pull request itself (for example `2.1.0-SNAPSHOT`).
+
+Versions 1.x were delivered by the Azure DevOps GitFlow pipeline the first article describes; their tags
+(`v1.0.0`, `v1.1.0`) still hold that pipeline.
 
 ## Retry-only vs circuit breaker: a reproducible demo
 
